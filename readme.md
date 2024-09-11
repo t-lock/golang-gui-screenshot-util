@@ -2,7 +2,7 @@
 
 Exploring Go and GUI development by creating a screenshotting utility.
 
-[![Video Preview](preview.png)](preview.webm)
+[![Video Preview](thumb.png)](preview.webm)
 
 Recommended usage:
 
