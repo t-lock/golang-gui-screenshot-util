@@ -1,0 +1,5 @@
+*.png
+bin/*
+# Ignore files with no extension (executables)
+*
+!*.*
