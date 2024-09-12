@@ -23,11 +23,17 @@ import (
 type boxState struct {
 	start   f32.Point
 	end     f32.Point
-	drawing bool
+	drawing mouseButton
 	saving  bool
 }
 
-var tag = new(bool)
+type mouseButton int
+
+const (
+	none mouseButton = iota
+	left
+	right
+)
 
 func main() {
 	go func() {
@@ -71,7 +77,7 @@ func loop(window *app.Window) error {
 			handlePointerEvents(gtx, window, &box)
 
 			// Draw the box if we're drawing
-			if box.drawing {
+			if box.drawing != none {
 				drawBox(&ops, box.start, box.end)
 			}
 
@@ -124,20 +130,26 @@ func handlePointerEvents(gtx layout.Context, w *app.Window, box *boxState) {
 		if ev, ok := ev.(pointer.Event); ok {
 			switch ev.Kind {
 			case pointer.Press:
-				if ev.Buttons == pointer.ButtonPrimary {
+				if ev.Buttons&(pointer.ButtonPrimary|pointer.ButtonSecondary) != 0 {
 					box.start = ev.Position
 					box.end = ev.Position
-					box.drawing = true
-					box.saving = false
+
+					switch ev.Buttons {
+					case pointer.ButtonPrimary:
+						box.drawing = left
+					case pointer.ButtonSecondary:
+						box.drawing = right
+					}
 				}
 			case pointer.Drag:
-				if box.drawing {
+				if box.drawing != none {
 					box.end = ev.Position
-					box.saving = false
 				}
 			case pointer.Release:
-				box.drawing = false
-				box.saving = true
+				if box.drawing == right {
+					box.saving = true
+				}
+				box.drawing = none
 			}
 		}
 	}
