@@ -6,6 +6,7 @@ import (
 	"image/png"
 	"log"
 	"os"
+	"time"
 
 	"gioui.org/app"
 	"gioui.org/f32"
@@ -105,7 +106,8 @@ func cropScreenshot(img image.Image, start f32.Point, end f32.Point) image.Image
 	cropSize := image.Rect(int(start.X), int(start.Y), int(end.X), int(end.Y))
 	newImg := img.(SubImager).SubImage(cropSize)
 
-	file, err := os.Create("cropped.png")
+	now := time.Now().Format("2006-01-02_15-04-05")
+	file, err := os.Create(now + ".png")
 	if err != nil {
 		panic(err)
 	}
