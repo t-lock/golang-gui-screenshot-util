@@ -10,4 +10,4 @@ Recommended usage:
 - place your executable somewhere on PATH (eg: `mv screenshot /usr/bin/local`)
 - configure a keyboard shortcut for your `screenshot` executable via your system settings
 
-File output is in your Home directory `~/cropped.png`
+File output is in your Home directory `~/cropped.png` on Linux (probably Mac as well). On Windows I have no idea. If you happen to stumble across this repo and install it on Windows, let me know how it goes!
