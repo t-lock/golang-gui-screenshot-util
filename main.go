@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -19,6 +21,7 @@ import (
 	"gioui.org/op/paint"
 
 	"github.com/kbinani/screenshot"
+	"golang.design/x/clipboard"
 )
 
 type boxState struct {
@@ -36,23 +39,35 @@ const (
 	right
 )
 
+type overwriteChan <-chan struct{}
+
 func main() {
 	go func() {
+		var box boxState
+		var clipboardChan overwriteChan
+
 		window := new(app.Window)
 		window.Option(app.Title("Screenshot"))
 		window.Perform(system.ActionFullscreen)
-		err := loop(window)
+		err := loop(window, &box, &clipboardChan)
 		if err != nil {
 			log.Fatal(err)
 		}
-		os.Exit(0)
+		if !box.saving {
+			os.Exit(0)
+		}
+
+		if clipboardChan != nil {
+			<-clipboardChan
+			os.Exit(0)
+		}
 	}()
+
 	app.Main()
 }
 
-func loop(window *app.Window) error {
+func loop(window *app.Window, box *boxState, clipboardChan *overwriteChan) error {
 	var ops op.Ops
-	var box boxState
 
 	bgImage, err := getScreen()
 	if err != nil {
@@ -75,7 +90,7 @@ func loop(window *app.Window) error {
 			pointer.CursorCrosshair.Add(gtx.Ops)
 
 			// Capture pointer events
-			handlePointerEvents(gtx, window, &box)
+			handlePointerEvents(gtx, window, box)
 
 			// Draw the box if we're drawing
 			if box.drawing != none {
@@ -84,8 +99,14 @@ func loop(window *app.Window) error {
 
 			// Save the screenshot if we're saving
 			if box.saving {
-				cropScreenshot(bgImage, box.start, box.end)
-				os.Exit(0)
+				image := cropScreenshot(bgImage, box.start, box.end)
+
+				// Put image on clipboard
+				*clipboardChan, err = putImageOnClipboard(image)
+				if err != nil {
+					log.Fatalf("Failed to put image on clipboard: %v", err)
+				}
+				window.Perform(system.ActionClose)
 			}
 
 			// Pass the drawing operations to the GPU
@@ -118,6 +139,25 @@ func cropScreenshot(img image.Image, start f32.Point, end f32.Point) image.Image
 	}
 
 	return newImg
+}
+
+func putImageOnClipboard(img image.Image) (overwriteChan, error) {
+	// Convert image to PNG
+	buf := new(bytes.Buffer)
+	if err := png.Encode(buf, img); err != nil {
+		return nil, fmt.Errorf("failed to encode image: %w", err)
+	}
+
+	// Initialize the clipboard
+	err := clipboard.Init()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize clipboard: %w", err)
+	}
+
+	// Write image to clipboard
+	changed := clipboard.Write(clipboard.FmtImage, buf.Bytes())
+
+	return changed, nil
 }
 
 func handlePointerEvents(gtx layout.Context, w *app.Window, box *boxState) {
