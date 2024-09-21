@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"image/png"
 	"log"
+	"math"
 	"os"
 	"time"
 
@@ -25,10 +26,11 @@ import (
 )
 
 type selectionState struct {
-	start   f32.Point
-	end     f32.Point
-	drawing mouseButton
-	saving  bool
+	cursorPos f32.Point
+	start     f32.Point
+	end       f32.Point
+	drawing   mouseButton
+	saving    bool
 }
 
 type mouseButton int
@@ -94,9 +96,12 @@ func loop(window *app.Window, selection *selectionState, bgImage image.Image, cl
 			// Capture pointer events
 			handlePointerEvents(gtx, window, selection)
 
+			// Draw the mask
+			drawMask(gtx, selection)
+
 			// Draw the box if we're drawing
 			if selection.drawing != none {
-				drawBox(&ops, selection.start, selection.end)
+				drawBox(&ops, selection)
 			}
 
 			// Save the screenshot if we're saving
@@ -171,19 +176,22 @@ func handlePointerEvents(gtx layout.Context, w *app.Window, selection *selection
 	for {
 		ev, ok := gtx.Event(pointer.Filter{
 			Target: w,
-			Kinds:  pointer.Press | pointer.Drag | pointer.Release,
+			Kinds:  pointer.Move | pointer.Press | pointer.Drag | pointer.Release,
 		})
 		if !ok {
 			break
 		}
 		if ev, ok := ev.(pointer.Event); ok {
 			switch ev.Kind {
+			case pointer.Move:
+				selection.cursorPos = ev.Position
 			case pointer.Press:
 				if ev.Buttons&(pointer.ButtonPrimary|pointer.ButtonSecondary) != 0 {
 					selection.start = ev.Position
 					selection.end = ev.Position
 				}
 			case pointer.Drag:
+				selection.cursorPos = ev.Position
 				switch ev.Buttons {
 				case pointer.ButtonPrimary:
 					selection.drawing = left
@@ -205,15 +213,43 @@ func handlePointerEvents(gtx layout.Context, w *app.Window, selection *selection
 	area.Pop()
 }
 
-// func drawMask(ops *op.Ops, box *selectionState, cursorLoc, boxStart f32.Point) {
-// 	shade := color.NRGBA{R: 0, G: 0, B: 0, A: 50}
-// }
+func drawMask(gtx layout.Context, selection *selectionState) {
+	ops := gtx.Ops
+	width := float32(gtx.Constraints.Max.X)
+	height := float32(gtx.Constraints.Max.Y)
+	shade := color.NRGBA{R: 0, G: 0, B: 0, A: 200}
 
-func drawBox(ops *op.Ops, start, end f32.Point) {
-	min := f32.Pt(min(start.X, end.X), min(start.Y, end.Y))
-	max := f32.Pt(max(start.X, end.X), max(start.Y, end.Y))
+	var path clip.Path
+	path.Begin(ops)
 
-	b4d455 := color.NRGBA{R: 180, G: 212, B: 85, A: 255}
+	path.LineTo(f32.Pt(width, 0))
+	path.LineTo(f32.Pt(width, height))
+	path.LineTo(f32.Pt(0, height))
+	path.LineTo(f32.Pt(0, 0))
+
+	if selection.drawing == none {
+		path.MoveTo(selection.cursorPos)
+		path.Move(f32.Pt(50, 0))
+		path.ArcTo(selection.cursorPos, selection.cursorPos, -2*math.Pi)
+	} else {
+		path.MoveTo(selection.start)
+		path.LineTo(f32.Pt(selection.start.X, selection.end.Y))
+		path.LineTo(selection.end)
+		path.LineTo(f32.Pt(selection.end.X, selection.start.Y))
+		path.LineTo(selection.start)
+	}
+
+	defer clip.Outline{Path: path.End()}.Op().Push(ops).Pop()
+	paint.ColorOp{Color: shade}.Add(ops)
+	paint.PaintOp{}.Add(ops)
+}
+
+func drawBox(ops *op.Ops, selection *selectionState) {
+	min := f32.Pt(min(selection.start.X, selection.end.X), min(selection.start.Y, selection.end.Y))
+	max := f32.Pt(max(selection.start.X, selection.end.X), max(selection.start.Y, selection.end.Y))
+
+	// b4d455 := color.NRGBA{R: 180, G: 212, B: 85, A: 255}
+	white := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
 
 	path := clip.Path{}
 	path.Begin(ops)
@@ -223,7 +259,7 @@ func drawBox(ops *op.Ops, start, end f32.Point) {
 	path.LineTo(f32.Pt(min.X, max.Y))
 	path.Close()
 
-	paint.FillShape(ops, b4d455, clip.Stroke{
+	paint.FillShape(ops, white, clip.Stroke{
 		Path:  path.End(),
 		Width: 1,
 	}.Op())
