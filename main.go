@@ -46,10 +46,17 @@ func main() {
 		var box boxState
 		var clipboardChan overwriteChan
 
+		bgImage, err := getScreen()
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		window := new(app.Window)
 		window.Option(app.Title("Screenshot"))
-		window.Perform(system.ActionFullscreen)
-		err := loop(window, &box, &clipboardChan)
+		window.Option(app.Decorated(false))
+		window.Option(app.Size(1, 1))
+
+		err = loop(window, &box, bgImage, &clipboardChan)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -66,13 +73,8 @@ func main() {
 	app.Main()
 }
 
-func loop(window *app.Window, box *boxState, clipboardChan *overwriteChan) error {
+func loop(window *app.Window, box *boxState, bgImage image.Image, clipboardChan *overwriteChan) error {
 	var ops op.Ops
-
-	bgImage, err := getScreen()
-	if err != nil {
-		return err
-	}
 
 	for {
 		switch e := window.Event().(type) {
@@ -102,12 +104,17 @@ func loop(window *app.Window, box *boxState, clipboardChan *overwriteChan) error
 				image := cropScreenshot(bgImage, box.start, box.end)
 
 				// Put image on clipboard
+				var err error
 				*clipboardChan, err = putImageOnClipboard(image)
 				if err != nil {
 					log.Fatalf("Failed to put image on clipboard: %v", err)
 				}
 				window.Perform(system.ActionClose)
 			}
+
+			// Make the window fullscreen
+			window.Perform(system.ActionCenter)
+			window.Perform(system.ActionFullscreen)
 
 			// Pass the drawing operations to the GPU
 			e.Frame(gtx.Ops)
