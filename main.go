@@ -24,7 +24,7 @@ import (
 	"golang.design/x/clipboard"
 )
 
-type boxState struct {
+type selectionState struct {
 	start   f32.Point
 	end     f32.Point
 	drawing mouseButton
@@ -43,7 +43,7 @@ type overwriteChan <-chan struct{}
 
 func main() {
 	go func() {
-		var box boxState
+		var selection selectionState
 		var clipboardChan overwriteChan
 
 		bgImage, err := getScreen()
@@ -56,11 +56,11 @@ func main() {
 		window.Option(app.Decorated(false))
 		window.Option(app.Size(1, 1))
 
-		err = loop(window, &box, bgImage, &clipboardChan)
+		err = loop(window, &selection, bgImage, &clipboardChan)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if !box.saving {
+		if !selection.saving {
 			os.Exit(0)
 		}
 
@@ -73,7 +73,7 @@ func main() {
 	app.Main()
 }
 
-func loop(window *app.Window, box *boxState, bgImage image.Image, clipboardChan *overwriteChan) error {
+func loop(window *app.Window, selection *selectionState, bgImage image.Image, clipboardChan *overwriteChan) error {
 	var ops op.Ops
 
 	for {
@@ -92,16 +92,16 @@ func loop(window *app.Window, box *boxState, bgImage image.Image, clipboardChan 
 			pointer.CursorCrosshair.Add(gtx.Ops)
 
 			// Capture pointer events
-			handlePointerEvents(gtx, window, box)
+			handlePointerEvents(gtx, window, selection)
 
 			// Draw the box if we're drawing
-			if box.drawing != none {
-				drawBox(&ops, box.start, box.end)
+			if selection.drawing != none {
+				drawBox(&ops, selection.start, selection.end)
 			}
 
 			// Save the screenshot if we're saving
-			if box.saving {
-				image := cropScreenshot(bgImage, box.start, box.end)
+			if selection.saving {
+				image := cropScreenshot(bgImage, selection)
 
 				// Put image on clipboard
 				var err error
@@ -127,11 +127,11 @@ func getScreen() (image.Image, error) {
 	return screenshot.CaptureRect(bounds)
 }
 
-func cropScreenshot(img image.Image, start f32.Point, end f32.Point) image.Image {
+func cropScreenshot(img image.Image, selection *selectionState) image.Image {
 	type SubImager interface {
 		SubImage(r image.Rectangle) image.Image
 	}
-	cropSize := image.Rect(int(start.X), int(start.Y), int(end.X), int(end.Y))
+	cropSize := image.Rect(int(selection.start.X), int(selection.start.Y), int(selection.end.X), int(selection.end.Y))
 	newImg := img.(SubImager).SubImage(cropSize)
 
 	now := time.Now().Format("2006-01-02_15-04-05")
@@ -167,7 +167,7 @@ func putImageOnClipboard(img image.Image) (overwriteChan, error) {
 	return changed, nil
 }
 
-func handlePointerEvents(gtx layout.Context, w *app.Window, box *boxState) {
+func handlePointerEvents(gtx layout.Context, w *app.Window, selection *selectionState) {
 	for {
 		ev, ok := gtx.Event(pointer.Filter{
 			Target: w,
@@ -180,25 +180,22 @@ func handlePointerEvents(gtx layout.Context, w *app.Window, box *boxState) {
 			switch ev.Kind {
 			case pointer.Press:
 				if ev.Buttons&(pointer.ButtonPrimary|pointer.ButtonSecondary) != 0 {
-					box.start = ev.Position
-					box.end = ev.Position
-
-					switch ev.Buttons {
-					case pointer.ButtonPrimary:
-						box.drawing = left
-					case pointer.ButtonSecondary:
-						box.drawing = right
-					}
+					selection.start = ev.Position
+					selection.end = ev.Position
 				}
 			case pointer.Drag:
-				if box.drawing != none {
-					box.end = ev.Position
+				switch ev.Buttons {
+				case pointer.ButtonPrimary:
+					selection.drawing = left
+				case pointer.ButtonSecondary:
+					selection.drawing = right
 				}
+				selection.end = ev.Position
 			case pointer.Release:
-				if box.drawing == right {
-					box.saving = true
+				if selection.drawing == right {
+					selection.saving = true
+					selection.drawing = none
 				}
-				box.drawing = none
 			}
 		}
 	}
@@ -207,6 +204,10 @@ func handlePointerEvents(gtx layout.Context, w *app.Window, box *boxState) {
 	event.Op(gtx.Ops, w)
 	area.Pop()
 }
+
+// func drawMask(ops *op.Ops, box *selectionState, cursorLoc, boxStart f32.Point) {
+// 	shade := color.NRGBA{R: 0, G: 0, B: 0, A: 50}
+// }
 
 func drawBox(ops *op.Ops, start, end f32.Point) {
 	min := f32.Pt(min(start.X, end.X), min(start.Y, end.Y))
