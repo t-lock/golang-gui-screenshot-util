@@ -30,7 +30,19 @@ type selectionState struct {
 	start     f32.Point
 	end       f32.Point
 	drawing   mouseButton
+	editing   bool
 	saving    bool
+}
+
+type editorState struct {
+	markups        []markup
+	currentMarkupI int
+}
+
+type markup struct {
+	start      f32.Point
+	end        f32.Point
+	buttonType mouseButton
 }
 
 type mouseButton int
@@ -46,6 +58,7 @@ type overwriteChan <-chan struct{}
 func main() {
 	go func() {
 		var selection selectionState
+		var editor editorState
 		var clipboardChan overwriteChan
 
 		bgImage, err := getScreen()
@@ -58,7 +71,7 @@ func main() {
 		window.Option(app.Decorated(false))
 		window.Option(app.Size(1, 1))
 
-		err = loop(window, &selection, bgImage, &clipboardChan)
+		err = loop(window, bgImage, &selection, &editor, &clipboardChan)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -75,7 +88,7 @@ func main() {
 	app.Main()
 }
 
-func loop(window *app.Window, selection *selectionState, bgImage image.Image, clipboardChan *overwriteChan) error {
+func loop(window *app.Window, bgImage image.Image, selection *selectionState, editor *editorState, clipboardChan *overwriteChan) error {
 	var ops op.Ops
 
 	for {
@@ -94,7 +107,7 @@ func loop(window *app.Window, selection *selectionState, bgImage image.Image, cl
 			pointer.CursorCrosshair.Add(gtx.Ops)
 
 			// Capture pointer events
-			handlePointerEvents(gtx, window, selection)
+			handlePointerEvents(gtx, window, selection, editor)
 
 			// Draw the mask
 			drawMask(gtx, selection)
@@ -103,6 +116,9 @@ func loop(window *app.Window, selection *selectionState, bgImage image.Image, cl
 			if selection.drawing != none {
 				drawBox(&ops, selection)
 			}
+
+			// Draw markups if we have them
+			drawMarkups(&ops, editor)
 
 			// Save the screenshot if we're saving
 			if selection.saving {
@@ -172,7 +188,7 @@ func putImageOnClipboard(img image.Image) (overwriteChan, error) {
 	return changed, nil
 }
 
-func handlePointerEvents(gtx layout.Context, w *app.Window, selection *selectionState) {
+func handlePointerEvents(gtx layout.Context, w *app.Window, selection *selectionState, editor *editorState) {
 	for {
 		ev, ok := gtx.Event(pointer.Filter{
 			Target: w,
@@ -187,22 +203,49 @@ func handlePointerEvents(gtx layout.Context, w *app.Window, selection *selection
 				selection.cursorPos = ev.Position
 			case pointer.Press:
 				if ev.Buttons&(pointer.ButtonPrimary|pointer.ButtonSecondary) != 0 {
-					selection.start = ev.Position
-					selection.end = ev.Position
+					if selection.editing {
+						markup := markup{
+							start:      ev.Position,
+							end:        ev.Position,
+							buttonType: none,
+						}
+						switch ev.Buttons {
+						case pointer.ButtonPrimary:
+							markup.buttonType = left
+						case pointer.ButtonSecondary:
+							markup.buttonType = right
+						}
+						editor.markups = append(editor.markups, markup)
+						editor.currentMarkupI = len(editor.markups) - 1
+					} else {
+						selection.start = ev.Position
+						selection.end = ev.Position
+					}
 				}
 			case pointer.Drag:
-				selection.cursorPos = ev.Position
-				switch ev.Buttons {
-				case pointer.ButtonPrimary:
-					selection.drawing = left
-				case pointer.ButtonSecondary:
-					selection.drawing = right
+				if ev.Buttons&(pointer.ButtonPrimary|pointer.ButtonSecondary) != 0 {
+
+					if selection.editing {
+						editor.markups[editor.currentMarkupI].end = ev.Position
+					} else {
+						selection.cursorPos = ev.Position
+						switch ev.Buttons {
+						case pointer.ButtonPrimary:
+							selection.drawing = left
+						case pointer.ButtonSecondary:
+							selection.drawing = right
+						}
+						selection.end = ev.Position
+					}
 				}
-				selection.end = ev.Position
 			case pointer.Release:
 				if selection.drawing == right {
 					selection.saving = true
 					selection.drawing = none
+				}
+
+				if selection.drawing == left {
+					selection.editing = true
 				}
 			}
 		}
@@ -263,4 +306,38 @@ func drawBox(ops *op.Ops, selection *selectionState) {
 		Path:  path.End(),
 		Width: 1,
 	}.Op())
+}
+
+func drawMarkups(ops *op.Ops, editor *editorState) {
+	for _, markup := range editor.markups {
+
+		min := image.Pt(int(min(markup.start.X, markup.end.X)), int(min(markup.start.Y, markup.end.Y)))
+		max := image.Pt(int(max(markup.start.X, markup.end.X)), int(max(markup.start.Y, markup.end.Y)))
+
+		red := color.NRGBA{R: 255, G: 0, B: 0, A: 255}
+
+		if markup.buttonType == left {
+			rect := clip.Rect{Min: min, Max: max}
+			paint.FillShape(ops, red,
+				clip.Stroke{
+					Path:  rect.Path(),
+					Width: 2,
+				}.Op(),
+			)
+		}
+
+		if markup.buttonType == right {
+			path := clip.Path{}
+			path.Begin(ops)
+			path.MoveTo(markup.start)
+			path.LineTo(markup.end)
+			arrow := path.End()
+
+			paint.FillShape(ops, red,
+				clip.Stroke{
+					Path:  arrow,
+					Width: 2,
+				}.Op())
+		}
+	}
 }
