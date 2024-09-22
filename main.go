@@ -327,17 +327,42 @@ func drawMarkups(ops *op.Ops, editor *editorState) {
 		}
 
 		if markup.buttonType == right {
+			// Draw the arrow line
 			path := clip.Path{}
 			path.Begin(ops)
 			path.MoveTo(markup.start)
 			path.LineTo(markup.end)
-			arrow := path.End()
+			arrowLine := path.End()
 
 			paint.FillShape(ops, red,
 				clip.Stroke{
-					Path:  arrow,
+					Path:  arrowLine,
 					Width: 2,
 				}.Op())
+
+			// Calculate the angle of the line
+			dx := markup.end.X - markup.start.X
+			dy := markup.end.Y - markup.start.Y
+			angle := math.Atan2(float64(dy), float64(dx))
+
+			// Calculate the arrow head points
+			leftPoint := f32.Pt(
+				markup.end.X-30*float32(math.Cos(angle))+10*float32(math.Cos(angle+math.Pi/2)),
+				markup.end.Y-30*float32(math.Sin(angle))+10*float32(math.Sin(angle+math.Pi/2)),
+			)
+			rightPoint := f32.Pt(
+				markup.end.X-30*float32(math.Cos(angle))+10*float32(math.Cos(angle-math.Pi/2)),
+				markup.end.Y-30*float32(math.Sin(angle))+10*float32(math.Sin(angle-math.Pi/2)),
+			)
+
+			// Draw the arrow head
+			path = clip.Path{}
+			path.Begin(ops)
+			path.MoveTo(markup.end)
+			path.LineTo(leftPoint)
+			path.LineTo(rightPoint)
+			path.Close()
+			paint.FillShape(ops, red, clip.Outline{Path: path.End()}.Op())
 		}
 	}
 }
