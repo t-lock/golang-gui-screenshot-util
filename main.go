@@ -68,8 +68,7 @@ func main() {
 
 		window := new(app.Window)
 		window.Option(app.Title("Screenshot"))
-		window.Option(app.Decorated(false))
-		window.Option(app.Size(1, 1))
+		window.Option(app.Fullscreen.Option())
 
 		err = loop(window, bgImage, &selection, &editor, &clipboardChan)
 		if err != nil {
@@ -132,10 +131,6 @@ func loop(window *app.Window, bgImage image.Image, selection *selectionState, ed
 				}
 				window.Perform(system.ActionClose)
 			}
-
-			// Make the window fullscreen
-			window.Perform(system.ActionCenter)
-			window.Perform(system.ActionFullscreen)
 
 			// Pass the drawing operations to the GPU
 			e.Frame(gtx.Ops)
