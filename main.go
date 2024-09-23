@@ -14,6 +14,7 @@ import (
 	"gioui.org/app"
 	"gioui.org/f32"
 	"gioui.org/io/event"
+	"gioui.org/io/key"
 	"gioui.org/io/pointer"
 	"gioui.org/io/system"
 	"gioui.org/layout"
@@ -121,7 +122,17 @@ func loop(window *app.Window, bgImage image.Image, selection *selectionState, ed
 
 			// Save the screenshot if we're saving
 			if selection.saving {
-				image := cropScreenshot(bgImage, selection)
+				var image image.Image
+				if selection.editing && len(editor.markups) > 0 {
+					uncropped, err := getScreen()
+					if err != nil {
+						log.Fatalf("Failed to get the annotated screenshot")
+					}
+
+					image = cropScreenshot(uncropped, selection)
+				} else {
+					image = cropScreenshot(bgImage, selection)
+				}
 
 				// Put image on clipboard
 				var err error
@@ -188,9 +199,14 @@ func handlePointerEvents(gtx layout.Context, w *app.Window, selection *selection
 		ev, ok := gtx.Event(pointer.Filter{
 			Target: w,
 			Kinds:  pointer.Move | pointer.Press | pointer.Drag | pointer.Release,
+		}, key.Filter{
+			Name: key.NameReturn,
 		})
 		if !ok {
 			break
+		}
+		if _, ok := ev.(key.Event); ok {
+			selection.saving = true
 		}
 		if ev, ok := ev.(pointer.Event); ok {
 			switch ev.Kind {
