@@ -109,6 +109,9 @@ func loop(window *app.Window, bgImage image.Image, selection *selectionState, ed
 			// Capture pointer events
 			handlePointerEvents(gtx, window, selection, editor)
 
+			// Capture keyboard events
+			handleKeyboardEvents(gtx, selection, editor)
+
 			// Draw the mask
 			drawMask(gtx, selection)
 
@@ -199,14 +202,9 @@ func handlePointerEvents(gtx layout.Context, w *app.Window, selection *selection
 		ev, ok := gtx.Event(pointer.Filter{
 			Target: w,
 			Kinds:  pointer.Move | pointer.Press | pointer.Drag | pointer.Release,
-		}, key.Filter{
-			Name: key.NameReturn,
 		})
 		if !ok {
 			break
-		}
-		if _, ok := ev.(key.Event); ok {
-			selection.saving = true
 		}
 		if ev, ok := ev.(pointer.Event); ok {
 			switch ev.Kind {
@@ -265,6 +263,40 @@ func handlePointerEvents(gtx layout.Context, w *app.Window, selection *selection
 	area := clip.Rect{Max: gtx.Constraints.Max}.Push(gtx.Ops)
 	event.Op(gtx.Ops, w)
 	area.Pop()
+}
+
+func handleKeyboardEvents(gtx layout.Context, selection *selectionState, editor *editorState) {
+	for {
+		ev, ok := gtx.Event(key.Filter{
+			Optional: key.ModCtrl,
+		})
+		if !ok {
+			break
+		}
+		if ev, ok := ev.(key.Event); ok {
+			switch ev.Name {
+			case key.NameReturn:
+				selection.saving = true
+			case "Z":
+				if ev.Modifiers.Contain(key.ModCtrl) && ev.State != key.Release {
+					if selection.editing {
+						if len(editor.markups) == 0 {
+							editor.markups = editor.markups[:0]
+							selection.editing = false
+							selection.drawing = none
+						} else {
+							editor.markups = editor.markups[:len(editor.markups)-1]
+						}
+					} else if selection.drawing != none {
+						selection.drawing = none
+					} else {
+						os.Exit(0)
+					}
+				}
+			}
+		}
+
+	}
 }
 
 func drawMask(gtx layout.Context, selection *selectionState) {

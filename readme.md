@@ -13,17 +13,19 @@ Recommended usage:
 
 This tool is streamlined for capturing annotated or un-annotated screenshots of a selection of the active desktop, without any visual clutter. There are no buttons/ui and no clicks/inputs from the user are required beyond the absolute necessities for achieving the current task.
 
-This simplicity is achieved primarily through usage of right vs left click while dragging resulting in differnt behaviors, and forward-in-time-only sequencing of the workflow. Annotations currently supported are limited to red boxes and arrows, but planned features include text (just start typing, text appears where your cursor is), and the ability to change the annotation color (scroll to change color - affecting all annotations) and font-size (press up/down arrows - affecting all text).
+This simplicity is achieved primarily through usage of right vs left click while dragging resulting in differnt behaviors, and the sequential application of selection mode then annotation mode.
 
-The enitre available UX surface is outlined in the following flow chart, which highlights the core mechanic of proceeding through selection and annotation modes and right-vs-left click controls:
-
+ More features are planned, but at the time of writing, the enitre available UX surface is outlined in the following flow chart, which highlights the core mechanic of proceeding through selection and annotation modes and right-vs-left click controls.
 ```
            Start program with keyboard shortcut
                             |
-              ________________________________
+              ______________|_________________
              |                                |
     Drag selection with        Drag selection with
     left mouse button          right mouse button
+             |                                |
+             |    ( Press Ctrl+Z to move  )   |
+             |    ( backwards at any time )   |
              |                                |
       Annotation mode                         |
     _________|__________________              |
@@ -34,7 +36,6 @@ drag to draw boxes     drag to draw arrows    |
              |                                |
       Press enter to save                     |
              |________________________________|
-                            |
                             |
               Screenshot copied to clipboard 
                     and saved to disk
