@@ -161,7 +161,9 @@ func cropScreenshot(img image.Image, selection *selectionState) image.Image {
 	type SubImager interface {
 		SubImage(r image.Rectangle) image.Image
 	}
-	cropSize := image.Rect(int(selection.start.X)+1, int(selection.start.Y+1), int(selection.end.X-1), int(selection.end.Y-1))
+	min := f32.Pt(min(selection.start.X, selection.end.X), min(selection.start.Y, selection.end.Y))
+	max := f32.Pt(max(selection.start.X, selection.end.X), max(selection.start.Y, selection.end.Y))
+	cropSize := image.Rect(int(min.X)+1, int(min.Y+1), int(max.X-1), int(max.Y-1))
 	newImg := img.(SubImager).SubImage(cropSize)
 
 	now := time.Now().Format("2006-01-02_15-04-05")
@@ -318,11 +320,13 @@ func drawMask(gtx layout.Context, selection *selectionState) {
 		path.Move(f32.Pt(50, 0))
 		path.ArcTo(selection.cursorPos, selection.cursorPos, -2*math.Pi)
 	} else {
-		path.MoveTo(selection.start)
-		path.LineTo(f32.Pt(selection.start.X, selection.end.Y))
-		path.LineTo(selection.end)
-		path.LineTo(f32.Pt(selection.end.X, selection.start.Y))
-		path.LineTo(selection.start)
+		min := f32.Pt(min(selection.start.X, selection.end.X), min(selection.start.Y, selection.end.Y))
+		max := f32.Pt(max(selection.start.X, selection.end.X), max(selection.start.Y, selection.end.Y))
+		path.MoveTo(min)
+		path.LineTo(f32.Pt(min.X, max.Y))
+		path.LineTo(max)
+		path.LineTo(f32.Pt(max.X, min.Y))
+		path.LineTo(min)
 	}
 
 	defer clip.Outline{Path: path.End()}.Op().Push(ops).Pop()
