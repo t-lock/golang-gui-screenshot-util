@@ -161,7 +161,7 @@ func cropScreenshot(img image.Image, selection *selectionState) image.Image {
 	type SubImager interface {
 		SubImage(r image.Rectangle) image.Image
 	}
-	cropSize := image.Rect(int(selection.start.X), int(selection.start.Y), int(selection.end.X), int(selection.end.Y))
+	cropSize := image.Rect(int(selection.start.X)+1, int(selection.start.Y+1), int(selection.end.X-1), int(selection.end.Y-1))
 	newImg := img.(SubImager).SubImage(cropSize)
 
 	now := time.Now().Format("2006-01-02_15-04-05")
