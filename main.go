@@ -9,6 +9,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"path/filepath"
 	"time"
 
 	"gioui.org/app"
@@ -167,7 +168,13 @@ func cropScreenshot(img image.Image, selection *selectionState) image.Image {
 	newImg := img.(SubImager).SubImage(cropSize)
 
 	now := time.Now().Format("2006-01-02_15-04-05")
-	file, err := os.Create(now + ".png")
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
+	}
+	desktopPath := filepath.Join(homeDir, "Desktop", now+".png")
+
+	file, err := os.Create(desktopPath)
 	if err != nil {
 		panic(err)
 	}

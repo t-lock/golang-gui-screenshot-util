@@ -41,4 +41,4 @@ drag to draw boxes     drag to draw arrows    |
                     and saved to disk
 ```
 
-Your screenshot is available on the clipboard, and a file is output to your Home directory on Linux (and probably Mac as well). On Windows I have no idea. If you happen to stumble across this repo and install it on Windows, let me know how it goes!
+Your screenshot is available on the clipboard, and a file is output to your `~/Desktop` directory on Linux (and probably Mac as well). On Windows I have no idea. If you happen to stumble across this repo and install it on Windows, let me know how it goes!
